@@ -1,11 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-function CashBalanceForm({ selectedDate }) {
-  const [morningBalance, setMorningBalance] = useState('');
-  const [salesAmount, setSalesAmount] = useState('');
-  const [adjustments, setAdjustments] = useState('');
+function CashBalanceForm({ selectedDate, initialBalance, onBalanceUpdated }) {
+  const [morningBalance, setMorningBalance] = useState(initialBalance || '');
+  const [salesAmount, setSalesAmount] = useState(0);
+  const [adjustments, setAdjustments] = useState(0);
   const [cashBalanceId, setCashBalanceId] = useState('');
+
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const response = await axios.get(`http://localhost:8070/api/sales?date=${selectedDate}`);
+        const totalSales = response.data.reduce((sum, sale) => sum + sale.totalAmount, 0);
+        setSalesAmount(totalSales);
+      } catch (error) {
+        console.error('Error fetching sales:', error);
+      }
+    };
+    const fetchAdjustments = async () => {
+      try {
+        const response = await axios.get(`http://localhost:8070/api/adjustments?date=${selectedDate}`);
+        const totalAdjustments = response.data.reduce((sum, adj) => sum + (adj.type === 'cash' ? adj.amount : 0), 0);
+        setAdjustments(totalAdjustments);
+      } catch (error) {
+        console.error('Error fetching adjustments:', error);
+      }
+    };
+    fetchSales();
+    fetchAdjustments();
+  }, [selectedDate]);
 
   const handleMorningSubmit = async (e) => {
     e.preventDefault();
@@ -17,6 +40,7 @@ function CashBalanceForm({ selectedDate }) {
       setCashBalanceId(response.data._id);
       alert('Morning cash balance added!');
       setMorningBalance('');
+      if (onBalanceUpdated) onBalanceUpdated(parseFloat(morningBalance));
     } catch (error) {
       alert('Error adding morning balance: ' + error.response.data.message);
     }
@@ -25,16 +49,14 @@ function CashBalanceForm({ selectedDate }) {
   const handleEveningSubmit = async (e) => {
     e.preventDefault();
     try {
-      const eveningBalance = parseFloat(morningBalance || 0) + parseFloat(salesAmount || 0) + parseFloat(adjustments || 0);
+      const eveningBalance = (parseFloat(morningBalance) || 0) + salesAmount + adjustments;
       await axios.put(`http://localhost:8070/api/cash-balance/${cashBalanceId}`, {
-        salesAmount: parseFloat(salesAmount),
-        adjustments: parseFloat(adjustments),
+        salesAmount,
+        adjustments,
         eveningBalance,
       });
       alert('Evening cash balance updated!');
-      setSalesAmount('');
-      setAdjustments('');
-      setCashBalanceId('');
+      if (onBalanceUpdated) onBalanceUpdated(eveningBalance);
     } catch (error) {
       alert('Error updating evening balance: ' + error.response.data.message);
     }
@@ -65,10 +87,9 @@ function CashBalanceForm({ selectedDate }) {
           <input
             type="number"
             value={salesAmount}
-            onChange={(e) => setSalesAmount(e.target.value)}
-            className="w-full p-2 border rounded"
+            readOnly
+            className="w-full p-2 border rounded bg-gray-100"
             step="0.01"
-            required
           />
         </div>
         <div className="mb-2">
@@ -76,8 +97,8 @@ function CashBalanceForm({ selectedDate }) {
           <input
             type="number"
             value={adjustments}
-            onChange={(e) => setAdjustments(e.target.value)}
-            className="w-full p-2 border rounded"
+            readOnly
+            className="w-full p-2 border rounded bg-gray-100"
             step="0.01"
           />
         </div>

@@ -22,7 +22,7 @@ function StockForm({ selectedDate, onStockAdded }) {
       setItemName('');
       setUnitPrice('');
       setMorningCount('');
-      if (onStockAdded) onStockAdded(prev => [...prev, itemName]);
+      if (onStockAdded) onStockAdded(prev => [...new Set([...prev, itemName])]);
     } catch (error) {
       alert('Error adding morning stock: ' + error.response.data.message);
     }
